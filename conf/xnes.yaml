@@ -1,0 +1,7 @@
+func: sphere
+dim: [2]
+sigma: 1.3
+seed_num: 100
+max_steps: 10000000
+mode: normal
+momentum_weight: 0.8
