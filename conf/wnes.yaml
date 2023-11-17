@@ -1,8 +1,8 @@
-func: ackley
+func: sphere
 dim: [10]
 mean: 15.5
 sigma: 14.5
-eta: 0.1
+eta: 0.5
 pop_size: 100
 seed_num: 100
 max_steps: 300

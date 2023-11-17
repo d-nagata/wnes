@@ -32,6 +32,10 @@ def ackley(array):#m=15.5, sigma=14.5
 
     return term1 + term2 + 20 + np.exp(1)
 
+def sinc(array):
+    n = len(array)
+    return np.sum(np.sin(array)/array) - 1
+
 def rastrigin(array):#m=3, sigma=2
     n = len(array)
     return 10 * n + np.sum(array**2 - 10 * np.cos(2 * np.pi * array))

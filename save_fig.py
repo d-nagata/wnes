@@ -7,9 +7,11 @@ def loadPickle(fileName):
     with open(fileName, mode="rb") as f:
         return pickle.load(f)
 
+funcs = ["sphere", "ackley", "cigar", "ellipiside", "rastrigin", "rosenbrock", "tablet"]
+# for func in funcs:
 func = "sphere"
-save_dir_path="/home/nagata/wnes/wnes_data/"+func+"/2023_11_15/dim10_pop100_eta0.1"
-xnes_save_dir_path="/home/nagata/wnes/xnes_data/"+func+"/2023_11_15/dim10_pop100_eta0.1"
+save_dir_path="/home/nagata/wnes/wnes_data/sphere/2023_11_17/dim10_pop100_eta0.8"#"/home/nagata/wnes/wnes_data/"+func+"/2023_11_15/dim10_pop100_eta0.1"
+xnes_save_dir_path="/home/nagata/wnes/xnes_data/sphere/2023_11_17/dim10_pop100_eta0.8"#"/home/nagata/wnes/xnes_data/"+func+"/2023_11_15/dim10_pop100_eta0.1"
 os.makedirs(save_dir_path+"/fig", exist_ok=True)
 os.makedirs(xnes_save_dir_path+"/fig", exist_ok=True)
 
@@ -52,18 +54,18 @@ xnes_means = np.mean(np.array(xnes_all_mean), axis=0)
 xnes_errors = 1.96 * np.std(np.array(xnes_all_mean), axis=0) / np.sqrt(seeds)
 
 
-
+plt.rcParams.update({'font.size': 18})
 plt.figure(figsize=(10, 6))
 
-plt.plot(range(steps), means, label='WNES', color='b')
+plt.plot(range(steps), means, label='wNES', color='dodgerblue')
 plt.fill_between(range(steps), means - errors, means + errors, color='b', alpha=0.2)
-plt.plot(range(steps), xnes_means, label='XNES', color='r')
+plt.plot(range(steps), xnes_means, label='xNES', color='salmon')
 plt.fill_between(range(steps), xnes_means - xnes_errors, xnes_means + xnes_errors, color='r', alpha=0.2)
 
-plt.title(func)
 plt.xlabel('Steps')
 plt.ylabel('Value')
 plt.legend()
+plt.subplots_adjust(left=0.13, right=0.93, top=0.9, bottom=0.1)
 plt.savefig(save_dir_path+'/fig/'+func+'_w_x_mean.png')
 plt.savefig(save_dir_path+'/fig/'+func+'w_x_mean.eps')
 print("done")
