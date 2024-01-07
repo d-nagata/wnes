@@ -7,6 +7,7 @@ import scipy
 
 from typing import cast
 from typing import Optional
+from logging import getLogger
 
 
 _EPS = 1e-8
@@ -106,7 +107,7 @@ class WNES:
         self._eta = eta
 
         # distribution parameter
-        self._mean = mean.copy()
+        self._mean = mean
         self._C = (sigma**2)*np.eye(n_dim)
 
         self._g = 0
@@ -137,12 +138,15 @@ class WNES:
         return x
         
     def _sample_solution(self) -> np.ndarray:
-        z = self._rng.randn(self._n_dim)  # ~ N(0, I)
-        x = self._mean + scipy.linalg.sqrtm(self._C).dot(z)  # ~ N(m, σ^2 B B^T)
-        return x
+        # z = self._rng.randn(self._n_dim)  # ~ N(0, I)
+        # x = self._mean + scipy.linalg.sqrtm(self._C).dot(z)  # ~ N(m, σ^2 B B^T)
+        x = self._rng.multivariate_normal(mean=self._mean,cov= self._C, size=1, check_valid="warn")
+        # print(x)
+        return x[0]
 
-    def tell(self, solutions: list[tuple[np.ndarray, float]]) -> None:
+    def tell(self,i, solutions: list[tuple[np.ndarray, float]]) -> None:
         """Tell evaluation values"""
+        logger = getLogger(__name__)
 
         assert len(solutions) == self._popsize, "Must tell popsize-length solutions."
         for s in solutions:
@@ -180,8 +184,36 @@ class WNES:
             ],
             axis=0,
         )
+        updated_count = 0
+        while True:
+            if not ((np.all(np.linalg.eigvals(np.eye(self._n_dim) + self._eta*g_C)>0))) or not ((np.allclose((np.eye(self._n_dim) + self._eta*g_C), (np.eye(self._n_dim) + self._eta*g_C).T, atol=1e-8))):
+                eigs = np.linalg.eigvals(g_C)
+                # print(eigs)
+                # self._eta = -1/min(eigs)
+
+                if not(np.allclose((np.eye(self._n_dim) + self._eta*g_C), (np.eye(self._n_dim) + self._eta*g_C).T, atol=1e-8)):
+                    logger.info("symmetric")
+                    # self._eta*=0.1
+                    if not((np.all(np.linalg.eigvals(np.eye(self._n_dim) + self._eta*g_C)>0))):
+                        logger.info("positive eig")
+
+                elif not((np.all(np.linalg.eigvals(np.eye(self._n_dim) + self._eta*g_C)>0))):
+                    logger.info("only positive eig")
+                    # self._eta = -1/min(eigs)
+                else:
+                    logger.info("other reason")
+                self._eta*=0.1
+                logger.info(f"#{i}: updated eta-{self._eta}")
+                updated_count+=1
+
+                continue
+            break
 
         # parameter update
         self._mean = self._mean + self._eta_mean * G_mu
-        self._C = self._C + self._eta * G_C + self._eta  * g_C.dot(self._C).dot(g_C)
-        return self._mean,G_mu, self._C, G_C+g_C.dot(self._C).dot(g_C)
+        difference = self._eta * G_C + self._eta**2  * g_C.dot(self._C).dot(g_C)
+        self._C = self._C + difference
+        # print(f"post: {self._C}")
+        if not np.all(np.linalg.eigvals(self._C) > 0):
+            print("not positive!!")
+        return self._mean,G_mu, self._C, difference, g_C, updated_count

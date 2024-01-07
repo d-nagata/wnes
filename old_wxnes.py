@@ -3,16 +3,18 @@ from __future__ import annotations
 import math
 
 import numpy as np
+import scipy
 
 from typing import cast
 from typing import Optional
+from logging import getLogger
 
 
 _EPS = 1e-8
 _MEAN_MAX = 1e32
 _SIGMA_MAX = 1e32
 
-class XNES:
+class WXNES:
     """xNES stochastic optimizer class with ask-and-tell interface.
 
     Example:
@@ -71,7 +73,7 @@ class XNES:
         sigma: float,
         seed: Optional[int] = None,
         population_size: Optional[int] = None,
-        eta=None
+        eta:float=None
     ):
         assert sigma > 0, "sigma must be non-zero positive value"
 
@@ -99,17 +101,14 @@ class XNES:
         self._weights = weights
 
         # learning rate
-        self._eta_mean = 1.0
         if eta is None:
-            eta = (3 / 5) * (3 + math.log(n_dim)) / (n_dim * math.sqrt(n_dim))        
-        self._eta_sigma = eta
-        self._eta_B = eta
-        
+            eta=(3 / 5) * (3 + math.log(n_dim)) / (n_dim * math.sqrt(n_dim))
+        self._eta_mean = 1.0
+        self._eta = eta
 
         # distribution parameter
-        self._mean = mean.copy()
-        self._sigma = sigma
-        self._B = np.eye(n_dim)
+        self._mean = mean
+        self._A = (sigma)*np.eye(n_dim)
 
         self._g = 0
         self._rng = np.random.RandomState(seed)
@@ -130,19 +129,24 @@ class XNES:
         when multi-variate gaussian distribution is updated."""
         return self._g
 
+    def reseed_rng(self, seed: int) -> None:
+        self._rng.seed(seed)
+
     def ask(self) -> np.ndarray:
         """Sample a parameter"""
         x = self._sample_solution()
         return x
-
+        
     def _sample_solution(self) -> np.ndarray:
         # z = self._rng.randn(self._n_dim)  # ~ N(0, I)
-        # x = self._mean + self._sigma * self._B.dot(z)  # ~ N(m, σ^2 B B^T)
-        x = self._rng.multivariate_normal(mean=self._mean,cov= self._sigma**2 * self._B.dot(self._B.T), size=1, check_valid="warn")
+        # x = self._mean + scipy.linalg.sqrtm(self._C).dot(z)  # ~ N(m, σ^2 B B^T)
+        x = self._rng.multivariate_normal(mean=self._mean,cov= self._A.dot(self._A.T), size=1, check_valid="warn")
+        # print(x)
         return x[0]
 
-    def tell(self, solutions: list[tuple[np.ndarray, float]]) -> None:
+    def tell(self,i, solutions: list[tuple[np.ndarray, float]]) -> None:
         """Tell evaluation values"""
+        logger = getLogger(__name__)
 
         assert len(solutions) == self._popsize, "Must tell popsize-length solutions."
         for s in solutions:
@@ -155,31 +159,38 @@ class XNES:
 
         z_k = np.array(
             [
-                np.linalg.inv(self._sigma * self._B).dot(s[0] - self._mean)
+                np.linalg.inv(self._A.dot(self._A.T)).dot(s[0] - self._mean)
                 for s in solutions
             ]
         )
 
         # natural gradient estimation in local coordinate
-        G_delta = np.sum(
+        G_mu = np.sum(
             [self._weights[i] * z_k[i, :] for i in range(self.population_size)], axis=0
         )
-        G_M = np.sum(
+        g_M = np.sum(
             [
                 self._weights[i]
-                * (np.outer(z_k[i, :], z_k[i, :]) - np.eye(self._n_dim))
-                for i in range(self.population_size)
+                * (np.linalg.inv(self._A).dot(np.outer(s[0] - self._mean, s[0] - self._mean)).dot(np.linalg.inv(self._A.T)).dot(self._A).dot(self._A.T)) + ((self._A).dot(self._A.T).dot(np.linalg.inv(self._A)).dot(np.outer(s[0] - self._mean, s[0] - self._mean)).dot(np.linalg.inv(self._A.T))) -2*self._A.dot(self._A.T)
+                for i,s in enumerate(solutions)
             ],
             axis=0,
         )
-        G_sigma = G_M.trace() / self._n_dim
-        G_B = G_M - G_sigma * np.eye(self._n_dim)
+        updated_count = 0
+        # print(self._A)
+        # print(_expm(g_M))
 
         # parameter update
-        self._mean += self._eta_mean * self._sigma * np.dot(self._B, G_delta)
-        self._sigma *= math.exp((self._eta_sigma / 2.0) * G_sigma)
-        self._B = self._B.dot(_expm((self._eta_B / 2.0) * G_B))
-        return self._mean,self._sigma*self._B.dot(self._B.T)
+        self._mean = self._mean + self._eta_mean * G_mu
+        self._A = self._A.dot(_expm(((self._eta)/2.0)*g_M))
+
+
+        # difference = self._eta * G_C + self._eta**2  * g_C.dot(self._C).dot(g_C)
+        # self._C = self._C + difference
+        # print(f"post: {self._C}")
+        # if not np.all(np.linalg.eigvals(self._C) > 0):
+        #     print("not positive!!")
+        return self._mean,G_mu, updated_count
 
 def _expm(mat: np.ndarray) -> np.ndarray:
     D, U = np.linalg.eigh(mat)

@@ -27,18 +27,26 @@ def main(cfg:DictConfig):
     save_path = "./wnes_data/"+func+"/"+current_date
     
     for dim in dims:
-        save_dim_path=save_path+"/dim"+str(dim)+"_pop"+str(pop_size)+"_eta"+str(eta)+"/data"
+        save_dim_path=save_path+"/dim"+str(dim)+"_pop"+str(pop_size)+"_eta"+str(eta)+"_mean"+str(mean)+"_sigma"+str(sigma)+"/data"
         os.makedirs(save_dim_path, exist_ok=True)
         logger.info(f"dim:{dim}")
         for seed in range(seed_num):
             optimizer = WNES(mean=mean+np.zeros(dim),population_size=pop_size,eta=eta, sigma=sigma, seed=seed)
+            # print(optimizer._mean)
+            # print(optimizer._C)
             seed_data = {}
             fitness_raw_datas = []
             mean_raw_datas = []
             mean_grad_raw_datas = []
             Covs_raw_datas = []
             Covs_grad_raw_datas = []
+            Covs_nabra_raw_datas = []
+            updated_counts = {}
             for generation in range(max_steps):
+                # print(f"#{generation}")
+                # print(f"mean: {optimizer._mean}")
+                # print(f"C: {optimizer._C}")
+
                 solutions = []
                 for _ in range(optimizer.population_size):
                     # Ask a parameter
@@ -60,32 +68,41 @@ def main(cfg:DictConfig):
                     else:
                         raise ValueError("cant use this func!!!")
                     solutions.append((x, value))
+                    # print((x, value))
                 fitness_raw_datas.append(solutions)
                 values = [s[1] for s in solutions]
                 print(f"#{generation} {min(values)}")
-                print(solutions[np.argmin(np.array([s[1] for s in solutions]))])
-                if min(values)<1e-10:
-                    logger.info(f"seed:{seed} success!! gen:{generation}")
-                    seed_data["fitness_raw_data"]=fitness_raw_datas
-                    seed_data["mean_raw_datas"]=mean_raw_datas
-                    seed_data["mean_grad_raw_datas"]=mean_grad_raw_datas
-                    seed_data["Covs_raw_data"]=Covs_raw_datas
-                    seed_data["Covs_grad_raw_datas"]=Covs_grad_raw_datas
-                    seed_data["success"]=True
-                    seed_data["succeed_gen"]=generation
-                    break
+                # print(solutions[np.argmin(np.array([s[1] for s in solutions]))])
+                # if min(values)<1e-10:
+                #     logger.info(f"seed:{seed} success!! gen:{generation}")
+                #     seed_data["fitness_raw_data"]=fitness_raw_datas
+                #     seed_data["mean_raw_datas"]=mean_raw_datas
+                #     seed_data["mean_grad_raw_datas"]=mean_grad_raw_datas
+                #     seed_data["Covs_raw_data"]=Covs_raw_datas
+                #     seed_data["Covs_grad_raw_datas"]=Covs_grad_raw_datas
+                #     seed_data["Covs_nabra_raw_datas"]=Covs_nabra_raw_datas
+                #     seed_data["success"]=True
+                #     seed_data["succeed_gen"]=generation
+                #     break
                 # Tell evaluation values.
-                mean,mean_raw_grad,C,C_raw_grad = optimizer.tell(solutions)
-                mean_raw_datas.append(mean)
+                mean_for_save,mean_raw_grad,C, C_raw_grad, C_raw_nabra, updated_count = optimizer.tell(generation, solutions)
+                # print(f"mean: {mean}")
+                # print(f"C: {C}")
+                mean_raw_datas.append(mean_for_save)
                 mean_grad_raw_datas.append(mean_raw_grad)
                 Covs_raw_datas.append(C)
                 Covs_grad_raw_datas.append(C_raw_grad)
+                Covs_nabra_raw_datas.append(C_raw_nabra)
+                if updated_count>0:
+                    updated_counts[generation]=updated_count
             else:
                 seed_data["fitness_raw_data"]=fitness_raw_datas
                 seed_data["mean_raw_datas"]=mean_raw_datas
                 seed_data["mean_grad_raw_datas"]=mean_grad_raw_datas
                 seed_data["Covs_raw_data"]=Covs_raw_datas
                 seed_data["Covs_grad_raw_datas"]=Covs_grad_raw_datas
+                seed_data["Covs_nabra_raw_datas"]=Covs_nabra_raw_datas
+                seed_data["updated_counts"] = updated_counts
                 seed_data["success"]=False
                 logger.info(f"seed{seed}:fail...couldn't find solution.")
 
