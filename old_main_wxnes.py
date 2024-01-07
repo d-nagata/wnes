@@ -1,5 +1,5 @@
 import numpy as np
-from _wxnes import WXNES
+from old_wxnes import WXNES
 from funcs import sphere, tablet, cigar, rosenbrock, ellipiside, ackley,rastrigin,six_hunp_camel
 from omegaconf import DictConfig
 from logging import getLogger
