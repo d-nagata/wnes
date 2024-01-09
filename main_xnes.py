@@ -35,6 +35,9 @@ def main(cfg:DictConfig):
                 optimizer = XNES(mean=mean+np.zeros(dim),population_size=pop_size,eta=eta, sigma=sigma, seed=seed)
                 seed_data = {}
                 fitness_raw_datas = []
+                mean_raw_datas=[]
+                Covs_raw_datas = []
+                success_gen = -1
                 for generation in range(max_steps):
                     solutions = [] #solutions for one generation
                     for _ in range(optimizer.population_size):
@@ -62,11 +65,19 @@ def main(cfg:DictConfig):
                     values = [s[1] for s in solutions]
                     print(np.mean(np.array(values)))
                     mean_for_save,C = optimizer.tell(solutions)
-                    if min(values)<1e-10:
+                    if min(values)<1e-10 and success_gen==-1:
                         logger.info(f"seed:{seed} success!! gen:{generation}")
+                        success_gen = generation
+                    mean_raw_datas.append(mean_for_save)
+                    Covs_raw_datas.append(C)
                 else:
                     seed_data["fitness_raw_data"]=fitness_raw_datas
-                    logger.info(f"seed{seed}:fail...couldn't find solution.")
+                    seed_data["mean_raw_datas"]=mean_raw_datas
+                    seed_data["Covs_raw_data"]=Covs_raw_datas
+                    if (success_gen==-1):
+                        logger.info(f"seed{seed}:fail...couldn't find solution.")
+                    else:
+                        logger.info(f"seed{seed}:find solution! gen is {success_gen}")
 
                 with open(save_dim_path+"/seed"+str(seed), mode="wb") as f:
                     pickle.dump(seed_data, f)

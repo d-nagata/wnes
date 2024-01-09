@@ -41,7 +41,7 @@ def main(cfg:DictConfig):
                 Covs_raw_datas = []
                 Covs_grad_raw_datas = []
                 Covs_nabra_raw_datas = []
-                updated_counts = {}
+                success_gen = -1
                 for generation in range(max_steps):
                     solutions = [] #solutions for one generation
                     for _ in range(optimizer.population_size):
@@ -73,8 +73,9 @@ def main(cfg:DictConfig):
                     Covs_raw_datas.append(C)
                     Covs_grad_raw_datas.append(C_raw_grad)
                     Covs_nabra_raw_datas.append(C_raw_nabra)
-                    if min(values)<1e-10:
+                    if min(values)<1e-10 and success_gen==-1:
                         logger.info(f"seed:{seed} success!! gen:{generation}")
+                        success_gen = generation
                 else:
                     seed_data["fitness_raw_data"]=fitness_raw_datas
                     seed_data["mean_raw_datas"]=mean_raw_datas
@@ -84,7 +85,10 @@ def main(cfg:DictConfig):
                     seed_data["Covs_nabra_raw_datas"]=Covs_nabra_raw_datas
                     seed_data["updated_history"] = optimizer.eta_history
                     seed_data["success"]=False
-                    logger.info(f"seed{seed}:fail...couldn't find solution.")
+                    if (success_gen==-1):
+                        logger.info(f"seed{seed}:fail...couldn't find solution.")
+                    else:
+                        logger.info(f"seed{seed}:find solution! gen is {success_gen}")
 
                 with open(save_dim_path+"/seed"+str(seed), mode="wb") as f:
                     pickle.dump(seed_data, f)
