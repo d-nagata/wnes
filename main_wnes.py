@@ -1,5 +1,5 @@
 import numpy as np
-from _xnes import XNES
+from _wnes import WNES
 from funcs import sphere, tablet, cigar, rosenbrock, ellipiside, ackley,rastrigin,six_hunp_camel
 from omegaconf import DictConfig
 from logging import getLogger
@@ -22,19 +22,26 @@ def main(cfg:DictConfig):
     pop_size = cfg.pop_size
     seed_num = cfg.seed_num
     max_steps = cfg.max_steps
+    eta_update_rate = cfg.eta_update_rate
 
     current_date = datetime.datetime.now().strftime("%Y_%m_%d")
     save_date_path = "./wnes_data/"+func+"/"+current_date
     
     for dim in dims:
-        save_dim_path=save_date_path+"/dim"+str(dim)+"_pop"+str(pop_size)+"_eta"+str(eta)+"_mean"+str(mean)+"_sigma"+str(sigma)+"/data"
+        save_dim_path=save_date_path+"/dim"+str(dim)+"_pop"+str(pop_size)+"_eta"+str(eta)+"_mean"+str(mean)+"_sigma"+str(sigma)+"_eta_update_rate"+str(eta_update_rate)+"/data"
         os.makedirs(save_dim_path, exist_ok=True)
         logger.info(f"dim:{dim}")
         for seed in range(seed_num):
             try:
-                optimizer = XNES(mean=mean+np.zeros(dim),population_size=pop_size,eta=eta, sigma=sigma, seed=seed)
+                optimizer = WNES(mean=mean+np.zeros(dim),population_size=pop_size,eta=eta, sigma=sigma, seed=seed, eta_update_rate=eta_update_rate)
                 seed_data = {}
                 fitness_raw_datas = []
+                mean_raw_datas = []
+                mean_grad_raw_datas = []
+                Covs_raw_datas = []
+                Covs_grad_raw_datas = []
+                Covs_nabra_raw_datas = []
+                updated_counts = {}
                 for generation in range(max_steps):
                     solutions = [] #solutions for one generation
                     for _ in range(optimizer.population_size):
@@ -60,12 +67,23 @@ def main(cfg:DictConfig):
                         # print((x, value))
                     fitness_raw_datas.append(solutions)
                     values = [s[1] for s in solutions]
-                    print(np.mean(np.array(values)))
-                    mean_for_save,C = optimizer.tell(solutions)
+                    mean_for_save,mean_raw_grad,C, C_raw_grad, C_raw_nabra = optimizer.tell(solutions)
+                    mean_raw_datas.append(mean_for_save)
+                    mean_grad_raw_datas.append(mean_raw_grad)
+                    Covs_raw_datas.append(C)
+                    Covs_grad_raw_datas.append(C_raw_grad)
+                    Covs_nabra_raw_datas.append(C_raw_nabra)
                     if min(values)<1e-10:
                         logger.info(f"seed:{seed} success!! gen:{generation}")
                 else:
                     seed_data["fitness_raw_data"]=fitness_raw_datas
+                    seed_data["mean_raw_datas"]=mean_raw_datas
+                    seed_data["mean_grad_raw_datas"]=mean_grad_raw_datas
+                    seed_data["Covs_raw_data"]=Covs_raw_datas
+                    seed_data["Covs_grad_raw_datas"]=Covs_grad_raw_datas
+                    seed_data["Covs_nabra_raw_datas"]=Covs_nabra_raw_datas
+                    seed_data["updated_history"] = optimizer.eta_history
+                    seed_data["success"]=False
                     logger.info(f"seed{seed}:fail...couldn't find solution.")
 
                 with open(save_dim_path+"/seed"+str(seed), mode="wb") as f:

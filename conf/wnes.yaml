@@ -4,5 +4,6 @@ mean: 3.0
 sigma: 2.0
 eta: 0.1
 pop_size: 100
-seed_num: 100
-max_steps: 300
+seed_num: 1
+max_steps: 600
+eta_update_rate: 0.1

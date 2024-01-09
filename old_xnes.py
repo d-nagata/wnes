@@ -4,11 +4,15 @@ import math
 
 import numpy as np
 
+from typing import cast
 from typing import Optional
 
-from base_nes import BaseNES
 
-class XNES(BaseNES):
+_EPS = 1e-8
+_MEAN_MAX = 1e32
+_SIGMA_MAX = 1e32
+
+class XNES:
     """xNES stochastic optimizer class with ask-and-tell interface.
 
     Example:
@@ -69,6 +73,11 @@ class XNES(BaseNES):
         population_size: Optional[int] = None,
         eta=None
     ):
+        assert sigma > 0, "sigma must be non-zero positive value"
+
+        assert np.all(
+            np.abs(mean) < _MEAN_MAX
+        ), f"Abs of all elements of mean vector must be less than {_MEAN_MAX}"
 
         n_dim = len(mean)
         assert n_dim > 1, "The dimension of mean must be larger than 1"
@@ -134,6 +143,13 @@ class XNES(BaseNES):
 
     def tell(self, solutions: list[tuple[np.ndarray, float]]) -> None:
         """Tell evaluation values"""
+
+        assert len(solutions) == self._popsize, "Must tell popsize-length solutions."
+        for s in solutions:
+            assert np.all(
+                np.abs(s[0]) < _MEAN_MAX
+            ), f"Abs of all param values must be less than {_MEAN_MAX} to avoid overflow errors."
+        
         self._g += 1
         solutions.sort(key=lambda s: s[1])
 
