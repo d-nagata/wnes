@@ -64,7 +64,7 @@ def main(cfg:DictConfig):
                         else:
                             raise ValueError("cant use this func!!!")
                         solutions.append((x, value))
-                        # print((x, value))
+
                     fitness_raw_datas.append(solutions)
                     values = [s[1] for s in solutions]
                     mean_for_save,mean_raw_grad,C, C_raw_grad, C_raw_nabra = optimizer.tell(solutions)
@@ -85,6 +85,7 @@ def main(cfg:DictConfig):
                     seed_data["Covs_nabra_raw_datas"]=Covs_nabra_raw_datas
                     seed_data["updated_history"] = optimizer.eta_history
                     seed_data["success"]=False
+                    seed_data["is_positive_definite"]=optimizer.is_positive_definite
                     if (success_gen==-1):
                         logger.info(f"seed{seed}:fail...couldn't find solution.")
                     else:

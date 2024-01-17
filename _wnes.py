@@ -74,6 +74,7 @@ class WNES(BaseNES):
         self.eta_update_rate= eta_update_rate
         self.pre_eta_sigma = -1
         self.eta_history = [] #each data: (generation, (pre_eta, updated_eta))
+        self.is_positive_difinite = True
 
 
     @property
@@ -125,7 +126,7 @@ class WNES(BaseNES):
 
         # natural gradient estimation in local coordinate
         G_mu = np.sum(
-            [self._weights[i] * z_k[i, :] for i in range(self.population_size)], axis=0
+            [self._weights[i] * np.linalg.inv(self._C).dot((s[0] - self._mean)) for i,s in enumerate(solutions)], axis=0
         )
         G_C = np.sum(
             [
@@ -143,27 +144,40 @@ class WNES(BaseNES):
             ],
             axis=0,
         )
-        while True:
-            if not ((np.all(np.linalg.eigvals(np.eye(self._n_dim) + self._eta_sigma*g_C)>0))) or not ((np.allclose((np.eye(self._n_dim) + self._eta_sigma*g_C), (np.eye(self._n_dim) + self._eta_sigma*g_C).T, atol=1e-8))):
-                eigs = np.linalg.eigvals(g_C)
-                # print(eigs)
-                # self._eta = -1/min(eigs)
 
-                if not(np.allclose((np.eye(self._n_dim) + self._eta_sigma*g_C), (np.eye(self._n_dim) + self._eta_sigma*g_C).T, atol=1e-8)):
-                    logger.info("symmetric")
-                    if not((np.all(np.linalg.eigvals(np.eye(self._n_dim) + self._eta_sigma*g_C)>0))):
-                        logger.info("positive eig")
+        # if not (np.allclose(self._C, self._C.T, atol=1e-8)):
+        #     print("yes!!!!!!!!!!!")
+        #     # print(self._C)
+        #     # print(self._C.T)
+        # if not (np.allclose(np.linalg.inv(self._C), (np.linalg.inv(self._C)).T, atol=1e-10)):
+        #     print("no!!!!!!!")
 
-                elif not((np.all(np.linalg.eigvals(np.eye(self._n_dim) + self._eta_sigma*g_C)>0))):
-                    logger.info("only positive eig")
-                else:
-                    logger.info("other reason")
-                self.pre_eta_sigma=self._eta_sigma
-                self._eta_sigma*=0.1
-                self.eta_history.append((self._g, (self.pre_eta_sigma, self._eta_sigma)))
-                logger.info(f"#{self._g}: pre_eta: {self.pre_eta_sigma}, updated eta: {self._eta_sigma}")
-                continue
-            break
+        # for s in solutions:
+        #     aaa = np.outer(s[0] - self._mean, s[0] - self._mean)- self._C
+        #     if not (np.allclose(aaa, aaa.T, atol=1e-10)):
+        #         print("hi!!!!")
+            
+        # while True:
+        #     if not ((np.all(np.linalg.eigvals(np.eye(self._n_dim) + self._eta_sigma*g_C)>0))) or not ((np.allclose((np.eye(self._n_dim) + self._eta_sigma*g_C), (np.eye(self._n_dim) + self._eta_sigma*g_C).T, atol=1e-8))):
+        #         eigs = np.linalg.eigvals(g_C)
+        #         # print(eigs)
+        #         # self._eta = -1/min(eigs)
+
+        #         if not(np.allclose((np.eye(self._n_dim) + self._eta_sigma*g_C), (np.eye(self._n_dim) + self._eta_sigma*g_C).T, atol=1e-8)):
+        #             logger.info("symmetric")
+        #             if not((np.all(np.linalg.eigvals(np.eye(self._n_dim) + self._eta_sigma*g_C)>0))):
+        #                 logger.info("positive eig")
+
+        #         elif not((np.all(np.linalg.eigvals(np.eye(self._n_dim) + self._eta_sigma*g_C)>0))):
+        #             logger.info("only positive eig")
+        #         else:
+        #             logger.info("other reason")
+        #         self.pre_eta_sigma=self._eta_sigma
+        #         self._eta_sigma*=0.1
+        #         self.eta_history.append((self._g, (self.pre_eta_sigma, self._eta_sigma)))
+        #         logger.info(f"#{self._g}: pre_eta: {self.pre_eta_sigma}, updated eta: {self._eta_sigma}")
+        #         continue
+        #     break
 
         # parameter update
         self._mean = self._mean + self._eta_mean * G_mu
@@ -171,5 +185,5 @@ class WNES(BaseNES):
         self._C = self._C + difference
         # print(f"post: {self._C}")
         if not np.all(np.linalg.eigvals(self._C) > 0):
-            print("not positive!!")
+            self.is_positive_difinite = False
         return self._mean,G_mu, self._C, difference, g_C

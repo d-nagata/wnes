@@ -24,7 +24,7 @@ def main(cfg:DictConfig):
     max_steps = cfg.max_steps
 
     current_date = datetime.datetime.now().strftime("%Y_%m_%d")
-    save_date_path = "./wnes_data/"+func+"/"+current_date
+    save_date_path = "./xnes_data/"+func+"/"+current_date
     
     for dim in dims:
         save_dim_path=save_date_path+"/dim"+str(dim)+"_pop"+str(pop_size)+"_eta"+str(eta)+"_mean"+str(mean)+"_sigma"+str(sigma)+"/data"
