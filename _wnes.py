@@ -74,7 +74,7 @@ class WNES(BaseNES):
         self.eta_update_rate= eta_update_rate
         self.pre_eta_sigma = -1
         self.eta_history = [] #each data: (generation, (pre_eta, updated_eta))
-        self.is_positive_difinite = True
+        self.is_positive_definite = True
 
 
     @property
@@ -185,5 +185,5 @@ class WNES(BaseNES):
         self._C = self._C + difference
         # print(f"post: {self._C}")
         if not np.all(np.linalg.eigvals(self._C) > 0):
-            self.is_positive_difinite = False
+            self.is_positive_definite = False
         return self._mean,G_mu, self._C, difference, g_C
