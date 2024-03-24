@@ -35,7 +35,10 @@ class WNES(BaseNES):
         eta_update_rate:float,
         seed: Optional[int] = None,
         population_size: Optional[int] = None,
-        eta:float=None
+        eta:float=None,
+        update_mean=True,
+        update_sigma=True,
+        eig_calc="mean"
     ):
         assert sigma > 0, "sigma must be non-zero positive value"
 
@@ -75,6 +78,7 @@ class WNES(BaseNES):
         self.pre_eta_sigma = -1
         self.eta_history = [] #each data: (generation, (pre_eta, updated_eta))
         self.is_positive_definite = True
+        self.eig_calc = eig_calc
 
 
     @property
@@ -99,9 +103,9 @@ class WNES(BaseNES):
     def _sample_solution(self) -> np.ndarray:
         # z = self._rng.randn(self._n_dim)  # ~ N(0, I)
         # x = self._mean + scipy.linalg.sqrtm(self._C).dot(z)  # ~ N(m, σ^2 B B^T)
-        x = self._rng.multivariate_normal(mean=self._mean,cov= self._C, size=1, check_valid="warn")
+        x = self._rng.multivariate_normal(mean=self._mean,cov= self._C, size=self._popsize, check_valid="warn")
         # print(x)
-        return x[0]
+        return x
 
     def ask(self) -> np.ndarray:
         """Sample a parameter"""
@@ -179,11 +183,28 @@ class WNES(BaseNES):
         #         continue
         #     break
 
-        # parameter update
-        self._mean = self._mean + self._eta_mean * G_mu
-        difference = self._eta_sigma * G_C + self._eta_sigma**2  * g_C.dot(self._C).dot(g_C)
+        #parameter update
+        w,_ = np.linalg.eig(self._C)
+        if self.eig_calc=="mean":
+            eta_by_c = np.mean(w)
+        elif self.eig_calc=="min":
+            eta_by_c = np.min(w)
+        else:
+            raise ValueError("informal eig calc  setting")
+
+        G_mu = guarantee_symmetric(G_mu)
+        self._mean = self._mean + self._eta_mean * G_mu*(eta_by_c)
+        G_C = guarantee_symmetric(G_C)
+        g_C = guarantee_symmetric(g_C)
+
+        difference = self._eta_sigma *eta_by_c* G_C + (self._eta_sigma*eta_by_c)**2  * g_C.dot(self._C).dot(g_C)
+        difference =  guarantee_symmetric(difference)
         self._C = self._C + difference
         # print(f"post: {self._C}")
         if not np.all(np.linalg.eigvals(self._C) > 0):
+            print("not positive")
             self.is_positive_definite = False
         return self._mean,G_mu, self._C, difference, g_C
+
+def guarantee_symmetric(x):
+    return (x+x.T)/2

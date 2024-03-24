@@ -6,7 +6,7 @@ from logging import getLogger
 import hydra
 import pickle
 import datetime
-import os
+import sys, os
 import shutil
 
 @hydra.main(config_name="wnes", version_base=None, config_path="conf")
@@ -23,6 +23,9 @@ def main(cfg:DictConfig):
     seed_num = cfg.seed_num
     max_steps = cfg.max_steps
     eta_update_rate = cfg.eta_update_rate
+    update_mean = cfg.update_mean
+    update_sigma = cfg.update_sigma
+    eig_calc = cfg.eig_calc
 
     current_date = datetime.datetime.now().strftime("%Y_%m_%d")
     save_date_path = "./wnes_data/"+func+"/"+current_date
@@ -33,7 +36,7 @@ def main(cfg:DictConfig):
         logger.info(f"dim:{dim}")
         for seed in range(seed_num):
             try:
-                optimizer = WNES(mean=mean+np.zeros(dim),population_size=pop_size,eta=eta, sigma=sigma, seed=seed, eta_update_rate=eta_update_rate)
+                optimizer = WNES(mean=mean+np.zeros(dim),population_size=pop_size,eta=eta, sigma=sigma, seed=seed, eta_update_rate=eta_update_rate, update_mean=update_mean, update_sigma=update_sigma, eig_calc=eig_calc)
                 seed_data = {}
                 fitness_raw_datas = []
                 mean_raw_datas = []
@@ -44,9 +47,10 @@ def main(cfg:DictConfig):
                 success_gen = -1
                 for generation in range(max_steps):
                     solutions = [] #solutions for one generation
-                    for _ in range(optimizer.population_size):
-                        # Ask a parameter
-                        x = optimizer.ask()
+                    # Ask a parameter
+                    xs = optimizer.ask()
+                    for i in range(optimizer.population_size):
+                        x=xs[i]
                         if (func=="sphere"):
                             value = sphere(x)
                         elif (func=="tablet"):
@@ -64,7 +68,8 @@ def main(cfg:DictConfig):
                         else:
                             raise ValueError("cant use this func!!!")
                         solutions.append((x, value))
-
+                    values = [x_value[1] for x_value in solutions]
+                    print(f"seed: {seed} gen:{generation}-{np.mean(np.array(values))}")
                     fitness_raw_datas.append(solutions)
                     values = [s[1] for s in solutions]
                     mean_for_save,mean_raw_grad,C, C_raw_grad, C_raw_nabra = optimizer.tell(solutions)
@@ -88,13 +93,17 @@ def main(cfg:DictConfig):
                     seed_data["is_positive_definite"]=optimizer.is_positive_definite
                     if (success_gen==-1):
                         logger.info(f"seed{seed}:fail...couldn't find solution.")
+                        if not optimizer.is_positive_definite:
+                            logger.info(f"not positive definite")
                     else:
                         logger.info(f"seed{seed}:find solution! gen is {success_gen}")
 
                 with open(save_dim_path+"/seed"+str(seed), mode="wb") as f:
                     pickle.dump(seed_data, f)
             except Exception as e:
-                logger.info(f"error occourd.failed....: {e}")
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                logger.info(f"error occourd.failed....: {e}|file:{fname},  line:{exc_tb.tb_lineno}")
     logger.info("end!!")
 
     hydra_cfg = hydra.core.hydra_config.HydraConfig.get()

@@ -67,7 +67,9 @@ class XNES(BaseNES):
         sigma: float,
         seed: Optional[int] = None,
         population_size: Optional[int] = None,
-        eta=None
+        eta=None,
+        update_mean:bool =True,
+        update_sigma:bool=True
     ):
 
         n_dim = len(mean)
@@ -104,6 +106,9 @@ class XNES(BaseNES):
 
         self._g = 0
         self._rng = np.random.RandomState(seed)
+
+        self.update_mean = update_mean
+        self.update_sigma = update_sigma
 
     @property
     def dim(self) -> int:
@@ -160,9 +165,11 @@ class XNES(BaseNES):
         G_B = G_M - G_sigma * np.eye(self._n_dim)
 
         # parameter update
-        self._mean += self._eta_mean * self._sigma * np.dot(self._B, G_delta)
-        self._sigma *= math.exp((self._eta_sigma / 2.0) * G_sigma)
-        self._B = self._B.dot(_expm((self._eta_B / 2.0) * G_B))
+        if self.update_mean:
+            self._mean += self._eta_mean * self._sigma * np.dot(self._B, G_delta)
+        if self.update_sigma:
+            self._sigma *= math.exp((self._eta_sigma / 2.0) * G_sigma)
+            self._B = self._B.dot(_expm((self._eta_B / 2.0) * G_B))
         return self._mean,self._sigma*self._B.dot(self._B.T)
 
 def _expm(mat: np.ndarray) -> np.ndarray:

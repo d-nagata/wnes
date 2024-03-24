@@ -2,8 +2,11 @@ func: sphere
 dim: [10]
 mean: 3.0
 sigma: 2.0
+eig_calc: min
 eta: 0.1
-pop_size: 100
+pop_size: 1000
 seed_num: 100
-max_steps: 300
+max_steps: 1000
 eta_update_rate: 0.1
+update_mean: true
+update_sigma: true
